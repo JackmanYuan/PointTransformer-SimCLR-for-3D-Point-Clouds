@@ -162,6 +162,9 @@ This notebook performs:
 - Visualizing the feature descriptors in 3D
 - Drawing **matching lines** between corresponding points in the two views
 
+![Screenshot 2025-07-01 at 1 03 34 AM](https://github.com/user-attachments/assets/9eb9dfb0-5d74-46f8-9937-7677bcdd2adb)
+
+
 > 🎯 This helps qualitatively assess how well the encoder produces consistent features across augmented point clouds.
 
 ---
