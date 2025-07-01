@@ -4,88 +4,88 @@ import open3d as o3d
 import torch
 from torch.utils.data import Dataset
 
-class SimCLRPointCloudDataset(Dataset):
-    def __init__(self, root_folder, num_points=2048, normalize=True):
-        self.root_folder = root_folder
-        self.num_points = num_points
-        self.normalize = normalize
-        self.files = []
+# class SimCLRPointCloudDataset(Dataset):
+#     def __init__(self, root_folder, num_points=2048, normalize=True):
+#         self.root_folder = root_folder
+#         self.num_points = num_points
+#         self.normalize = normalize
+#         self.files = []
 
-        for scene_folder in sorted(os.listdir(root_folder)):
-            for subfolder in ["vggt", "rgbd"]:
-                scene_path = os.path.join(root_folder, scene_folder, subfolder)
-                if os.path.exists(scene_path):
-                    for file in sorted(os.listdir(scene_path)):
-                        if file.endswith(".ply"):
-                            self.files.append(os.path.join(scene_path, file))
+#         for scene_folder in sorted(os.listdir(root_folder)):
+#             for subfolder in ["vggt", "rgbd"]:
+#                 scene_path = os.path.join(root_folder, scene_folder, subfolder)
+#                 if os.path.exists(scene_path):
+#                     for file in sorted(os.listdir(scene_path)):
+#                         if file.endswith(".ply"):
+#                             self.files.append(os.path.join(scene_path, file))
 
-    def __len__(self):
-        return len(self.files)
+#     def __len__(self):
+#         return len(self.files)
 
-    def __getitem__(self, idx):
-        pcd = o3d.io.read_point_cloud(self.files[idx])
-        points = np.asarray(pcd.points, dtype=np.float32)
-        colors = np.asarray(pcd.colors, dtype=np.float32) if pcd.has_colors() else np.zeros_like(points)
+#     def __getitem__(self, idx):
+#         pcd = o3d.io.read_point_cloud(self.files[idx])
+#         points = np.asarray(pcd.points, dtype=np.float32)
+#         colors = np.asarray(pcd.colors, dtype=np.float32) if pcd.has_colors() else np.zeros_like(points)
 
-        if self.normalize:
-            centroid = np.mean(points, axis=0)
-            points -= centroid
-            scale = np.max(np.linalg.norm(points, axis=1))
-            points /= scale
+#         if self.normalize:
+#             centroid = np.mean(points, axis=0)
+#             points -= centroid
+#             scale = np.max(np.linalg.norm(points, axis=1))
+#             points /= scale
 
-        # Generate two views
-        view1 = self._augment(points, colors)
-        view2 = self._augment(points, colors)
+#         # Generate two views
+#         view1 = self._augment(points, colors)
+#         view2 = self._augment(points, colors)
 
-        return view1, view2, self.files[idx]  # Added file path for consistency
+#         return view1, view2, self.files[idx]  # Added file path for consistency
 
-    def _augment(self, points, colors):
-        pc = points.copy()
+#     def _augment(self, points, colors):
+#         pc = points.copy()
 
-        # === Step 1: Safer Axis-Aligned Cropping with Fallback ===
-        crop_axis = np.random.choice(3)
-        crop_ratio = 0.7  # Keep 70% of points
-        min_val = np.min(pc[:, crop_axis])
-        max_val = np.max(pc[:, crop_axis])
-        crop_threshold = np.random.uniform(min_val, max_val)
-        mask = pc[:, crop_axis] < crop_threshold
+#         # === Step 1: Safer Axis-Aligned Cropping with Fallback ===
+#         crop_axis = np.random.choice(3)
+#         crop_ratio = 0.7  # Keep 70% of points
+#         min_val = np.min(pc[:, crop_axis])
+#         max_val = np.max(pc[:, crop_axis])
+#         crop_threshold = np.random.uniform(min_val, max_val)
+#         mask = pc[:, crop_axis] < crop_threshold
 
-        # Fallback: select top-N if too few remain
-        if np.sum(mask) < 512:  # Minimum point fallback
-            sorted_idx = np.argsort(pc[:, crop_axis])
-            mask = np.zeros(len(pc), dtype=bool)
-            mask[sorted_idx[:int(crop_ratio * len(pc))]] = True
+#         # Fallback: select top-N if too few remain
+#         if np.sum(mask) < 512:  # Minimum point fallback
+#             sorted_idx = np.argsort(pc[:, crop_axis])
+#             mask = np.zeros(len(pc), dtype=bool)
+#             mask[sorted_idx[:int(crop_ratio * len(pc))]] = True
 
-        pc = pc[mask]
-        colors = colors[mask]
+#         pc = pc[mask]
+#         colors = colors[mask]
 
-        # === Step 2: Sampling to num_points ===
-        if len(pc) >= self.num_points:
-            idxs = np.random.choice(len(pc), self.num_points, replace=False)
-        else:
-            idxs = np.random.choice(len(pc), self.num_points, replace=True)
-        pc = pc[idxs]
-        colors = colors[idxs]
+#         # === Step 2: Sampling to num_points ===
+#         if len(pc) >= self.num_points:
+#             idxs = np.random.choice(len(pc), self.num_points, replace=False)
+#         else:
+#             idxs = np.random.choice(len(pc), self.num_points, replace=True)
+#         pc = pc[idxs]
+#         colors = colors[idxs]
 
-        # === Step 3: Jitter ===
-        pc += np.random.normal(0, 0.01, size=pc.shape)
+#         # === Step 3: Jitter ===
+#         pc += np.random.normal(0, 0.01, size=pc.shape)
 
-        # === Step 4: Rotation (XYZ) ===
-        angles = np.random.uniform(0, 2 * np.pi, size=3)
-        Rx = np.array([[1, 0, 0],
-                    [0, np.cos(angles[0]), -np.sin(angles[0])],
-                    [0, np.sin(angles[0]),  np.cos(angles[0])]])
-        Ry = np.array([[ np.cos(angles[1]), 0, np.sin(angles[1])],
-                    [0, 1, 0],
-                    [-np.sin(angles[1]), 0, np.cos(angles[1])]])
-        Rz = np.array([[np.cos(angles[2]), -np.sin(angles[2]), 0],
-                    [np.sin(angles[2]),  np.cos(angles[2]), 0],
-                    [0, 0, 1]])
-        pc = pc @ (Rx @ Ry @ Rz).T
+#         # === Step 4: Rotation (XYZ) ===
+#         angles = np.random.uniform(0, 2 * np.pi, size=3)
+#         Rx = np.array([[1, 0, 0],
+#                     [0, np.cos(angles[0]), -np.sin(angles[0])],
+#                     [0, np.sin(angles[0]),  np.cos(angles[0])]])
+#         Ry = np.array([[ np.cos(angles[1]), 0, np.sin(angles[1])],
+#                     [0, 1, 0],
+#                     [-np.sin(angles[1]), 0, np.cos(angles[1])]])
+#         Rz = np.array([[np.cos(angles[2]), -np.sin(angles[2]), 0],
+#                     [np.sin(angles[2]),  np.cos(angles[2]), 0],
+#                     [0, 0, 1]])
+#         pc = pc @ (Rx @ Ry @ Rz).T
 
-        # === Step 5: Combine and return ===
-        feats = np.concatenate([pc, colors], axis=1)
-        return torch.from_numpy(feats).float()
+#         # === Step 5: Combine and return ===
+#         feats = np.concatenate([pc, colors], axis=1)
+#         return torch.from_numpy(feats).float()
     
 
 class SimCLRPointCloudDataset(Dataset):
@@ -152,6 +152,87 @@ class SimCLRPointCloudDataset(Dataset):
         pc = pc @ (Rx @ Ry @ Rz).T
 
         feats = np.concatenate([pc, colors], axis=1)
+        return torch.from_numpy(feats).float()
+
+class SimCLRPointCloudDatasetV2(Dataset):
+    def __init__(self, ply_folder, num_points=2048, normalize=True):
+        self.ply_folder = ply_folder
+        self.num_points = num_points
+        self.normalize = normalize
+        self.files = sorted([os.path.join(ply_folder, f)
+                             for f in os.listdir(ply_folder) if f.endswith('.ply')])
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        pcd = o3d.io.read_point_cloud(self.files[idx])
+        points = np.asarray(pcd.points, dtype=np.float32)
+        colors = np.asarray(pcd.colors, dtype=np.float32) if pcd.has_colors() else np.zeros_like(points)
+
+        view1 = self._augment_then_normalize(points, colors)
+        view2 = self._augment_then_normalize(points, colors)
+
+        return view1, view2, self.files[idx]
+
+    def _augment_then_normalize(self, points, colors):
+        pc = points.copy()
+        c = colors.copy()
+
+        # === Augmentation ===
+        # Crop along random axis
+        crop_axis = np.random.choice(3)
+        crop_ratio = 0.7
+        min_val = np.min(pc[:, crop_axis])
+        max_val = np.max(pc[:, crop_axis])
+        crop_threshold = np.random.uniform(min_val, max_val)
+        mask = pc[:, crop_axis] < crop_threshold
+
+        # Fallback if too few remain
+        if np.sum(mask) < 512:
+            sorted_idx = np.argsort(pc[:, crop_axis])
+            mask = np.zeros(len(pc), dtype=bool)
+            mask[sorted_idx[:int(crop_ratio * len(pc))]] = True
+
+        pc = pc[mask]
+        c = c[mask]
+
+        # Random uniform scaling
+        scale_factor = np.random.uniform(0.8, 1.2)
+        pc *= scale_factor
+
+        # Sampling
+        if len(pc) >= self.num_points:
+            idxs = np.random.choice(len(pc), self.num_points, replace=False)
+        else:
+            idxs = np.random.choice(len(pc), self.num_points, replace=True)
+        pc = pc[idxs]
+        c = c[idxs]
+
+        # Jitter
+        pc += np.random.normal(0, 0.01, size=pc.shape)
+
+        # Random rotation
+        angles = np.random.uniform(0, 2 * np.pi, size=3)
+        Rx = np.array([[1, 0, 0],
+                       [0, np.cos(angles[0]), -np.sin(angles[0])],
+                       [0, np.sin(angles[0]),  np.cos(angles[0])]])
+        Ry = np.array([[ np.cos(angles[1]), 0, np.sin(angles[1])],
+                       [0, 1, 0],
+                       [-np.sin(angles[1]), 0, np.cos(angles[1])]])
+        Rz = np.array([[np.cos(angles[2]), -np.sin(angles[2]), 0],
+                       [np.sin(angles[2]),  np.cos(angles[2]), 0],
+                       [0, 0, 1]])
+        pc = pc @ (Rx @ Ry @ Rz).T
+
+        # === Normalize ===
+        centroid = np.mean(pc, axis=0)
+        pc -= centroid
+        scale = np.max(np.linalg.norm(pc, axis=1))
+        pc /= scale
+
+        # === Combine ===
+        feats = np.concatenate([pc, c], axis=1)
         return torch.from_numpy(feats).float()
 
 

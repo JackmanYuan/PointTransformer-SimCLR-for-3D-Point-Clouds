@@ -31,12 +31,12 @@ loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0
 cfg = get_default_cfg()
 
 encoder1 = Backbone(cfg).to(device)
-ckpt1 = torch.load("model_archive/simclr_encoder_0630.pth", map_location=device) # Use your owwn path
+ckpt1 = torch.load("model_archive/simclr_encoder_curvature_weighted_0630_2.pth", map_location=device) # Use your owwn path
 encoder1.load_state_dict(ckpt1["encoder"])
 encoder1.eval()
 
 encoder2 = Backbone(cfg).to(device)
-ckpt2 = torch.load("model_archive/simclr_encoder_curvature_weighted_0630.pth", map_location=device) # Use your owwn path
+ckpt2 = torch.load("simclr_encoder_curvature_weighted.pth", map_location=device) # Use your owwn path
 encoder2.load_state_dict(ckpt2["encoder"])
 encoder2.eval()
 

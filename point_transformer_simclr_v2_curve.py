@@ -3,7 +3,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from model.model import Backbone
 from model.projection import ProjectionHead
-from utils.data_loader import SimCLRPointCloudDataset
+from utils.data_loader import SimCLRPointCloudDataset, SimCLRPointCloudDatasetV2
 from utils.loss import nt_xent_loss_with_weights
 from utils.config import get_default_cfg
 from utils.estimate_curvature import estimate_curvature 
@@ -20,7 +20,7 @@ params = list(encoder.parameters()) + list(projector.parameters())
 optimizer = torch.optim.Adam(params, lr=1e-3)
 
 # --------- Dataset & Dataloader ---------
-train_dataset = SimCLRPointCloudDataset(
+train_dataset = SimCLRPointCloudDatasetV2(
     ply_folder="data/ply",
     num_points=cfg.num_point,
 )
